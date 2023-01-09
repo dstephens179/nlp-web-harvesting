@@ -1,9 +1,13 @@
 # Web Harvesting & NLP Analysis with RSelenium & Gensim
 ## Uncovering Click-Bait in 2022's Most Popular Medium Posts in Data Science
 
-What makes a title & subtitle so appealing to click? What are the buzzwords attract data scientists? <br>
-In this project I sought out answers to these questions, and more:
-- How does the title & subtitle differ from those above the mean applauds to those below the mean?
-- How many applauds does it take to make an article above average?
-- How many articles make up the top 80% of applauds?
+What makes a title & subtitle so appealing to click? <br>
+Which words make readers engage and applaud the thousands of posts on medium.com? <br>
+
+I answer more of these questions in the, and dive deeper into the NLP analysis.
+
+
+1. [Web Harvesting process](https://github.com/dstephens179/nlp-web-harvesting/blob/main/01_web_harvesting.Rmd)
+2. [Data Preparation](https://github.com/dstephens179/nlp-web-harvesting/blob/main/02_data_preparation.Rmd)
+3. [NLP Conclusion using Gensim](https://github.com/dstephens179/nlp-web-harvesting/blob/main/03_nlp_analysis.ipynb)
 
