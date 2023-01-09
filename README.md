@@ -1,10 +1,10 @@
 # Web Harvesting & NLP Analysis with RSelenium & Gensim
-## Uncovering Click-Bait in 2022's Most Popular Medium Posts in Data Science
+## Uncovering Click-Bait & Engagement in 2022's Most Popular Medium Posts in Data Science
 
 What makes a title & subtitle so appealing to click? <br>
 Which words make readers engage and applaud the thousands of posts on medium.com? <br>
 
-I answer more of these questions in the, and dive deeper into the NLP analysis.
+I answer more of these questions, and dive deeper into the NLP analysis.
 
 
 - Full Project with Explanation: [NLP Conclusion using Gensim](https://github.com/dstephens179/nlp-web-harvesting/blob/main/03_nlp_analysis.ipynb)
