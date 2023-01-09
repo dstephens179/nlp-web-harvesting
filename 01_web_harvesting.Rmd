@@ -1,0 +1,81 @@
+---
+title: "Web Harvesting: RSelenium & rvest"
+---
+
+```{r setup, include=FALSE}
+library(netstat)
+library(data.table)
+library(RSelenium)
+library(rvest)
+library(tidyverse)
+library(glue)
+library(purrr)
+library(tibble)
+library(stringr)
+library(xml2)
+```
+
+
+# Create date sequences & url's
+```{r}
+url_base <- 'https://medium.com/tag/data-science/archive/'
+
+# full year
+full_year_2022 <- seq.Date(from = as.Date('2022/01/01'),to = as.Date('2022/12/31'), "days")
+full_year_2022_sequence <- strftime(strptime(full_year_2022,"%Y-%m-%d"),"%Y/%m/%d")
+link_df <- paste0(url_base, full_year_2022_sequence)
+
+```
+
+
+# RSelenium setup
+```{r}
+rs_driver_object <- rsDriver(browser = 'chrome',
+                             chromever = '108.0.5359.71',
+                             verbose = F,
+                             port = free_port())
+
+remDr <- rs_driver_object$client
+```
+
+
+# Harvest daily container data with RSelenium
+```{r}
+remDr$navigate("https://medium.com/tag/data-science/archive/2022/03/22")
+remDr$deleteAllCookies()
+
+
+
+# create empty vector
+all_container_data = c()
+
+
+# for loop iterates through each day in sequence
+for (i in link_df) {
+    
+    remDr$navigate(i)
+    
+    container_data_raw <- remDr$findElements(using = 'xpath', '//div[@class ="u-flex1 u-sm-maxWidthFullWidth"]')
+    
+    container_data <- lapply(container_data_raw, function (x){
+    x$getElementText() %>% unlist()
+}) %>% 
+    flatten_chr()
+    
+    all_container_data = rbind(all_container_data, container_data)
+}
+```
+
+
+# close selenium server
+```{r}
+remDr$close()
+system("taskkill /im java.exe /f")
+```
+
+
+
+# Save as rds
+```{r}
+write_rds(all_container_data, "00_archive/all_medium_data.rds")
+```

@@ -1,0 +1,169 @@
+---
+title: "Data Preparation for NLP in Python"
+---
+
+# LIBRARIES
+```{r setup, include=FALSE}
+library(data.table)
+library(tidyverse)
+library(purrr)
+library(lubridate)
+library(janitor)
+```
+
+
+# Import data
+```{r}
+all_data <- read_rds("00_archive/all_medium_data.rds")
+all_data_appended_raw <- as.data.frame(all_data) %>% rename('data' = V1)
+
+
+data_table <- data.frame(do.call('rbind', strsplit(as.character(all_data_appended_raw$data), "\n", fixed = T)))
+
+
+data_long_dt <- fread(input = "00_archive/2022_medium_archive_data_raw.csv", sep = "\n", header = F)
+```
+
+
+# Long data
+```{r}
+data_long_dt <- fread(input = "00_archive/2022_medium_archive_data_raw.csv", sep = "\n", header = T)
+
+
+# date sequence to remove date buttons at bottom of each page.
+full_date_sequence <- format(
+    seq.Date(
+        from = as.Date('2021-12-25'), 
+        to = as.Date('2023-01-06'), 
+        by = "days"),
+    format = "%B %d, %Y")
+    
+
+
+data_long_tbl <- as_tibble(data_long_dt) %>%
+    
+    # remove unnecessary rows (not needed for analysis)
+    filter(!str_detect(data, "response"),
+           !str_detect(data, "Top storiesArchive"),
+           !str_detect(data, "Sort by most read"),
+           !str_detect(data, "010203040506070809"),
+           !str_detect(data, paste(full_date_sequence, collapse = "|"))
+           ) %>% 
+    
+    # locate "Read more..." and claps combinations to separate posts
+    mutate(read_more  = ifelse(data == 'Read more…', 1, 0),
+           claps      = ifelse(grepl("^[[:digit:]]+", data) & lag(read_more) == 1, 1, NA),
+           post_start = case_when(
+               lag(read_more, 2) == 1 & lag(claps, 1) == 1 ~ 1,
+               lag(read_more, 1) == 1 & is.na(claps) ~ 1,
+               TRUE ~ 0
+           )) %>%
+    
+    # create post_number from cumulative sum
+    mutate(post_number = cumsum(post_start)) %>%
+    select(data, post_number) %>%
+    
+    # add the column_id to pivot_wider
+    group_by(post_number) %>%
+    mutate(item_id = seq_along(post_number)) %>%
+    ungroup()
+```
+
+
+# Wide data
+```{r}
+data_wide_tbl <- data_long_tbl %>%
+    pivot_wider(names_from = item_id, values_from = data) %>%
+    
+    # remove duplicates
+    unite('combined', `1`, `3`, sep = " ", remove = F) %>%
+    distinct(combined, .keep_all = T) %>%
+    
+    rename(one   = `1`,
+           two   = `2`,
+           three = `3`,
+           four  = `4`,
+           five  = `5`,
+           six   = `6`,
+           seven = `7`,
+           eight = `8`,
+           nine  = `9`) %>%
+    select(post_number, one, two, three, four, five, six, seven, eight, nine)
+
+
+
+# remove unnecessary dates, as not analyzed
+partial_date_sequence <- format(
+    seq.Date(
+        from = as.Date('2021-12-25'), 
+        to = as.Date('2023-01-06'), 
+        by = "days"),
+    format = "%b %e, %Y") %>%
+    str_squish()
+
+
+
+
+data_prepared_tbl <- data_wide_tbl %>% 
+    
+    # column clean-up
+    separate(one, 'one', sep = ',|-| in ') %>%
+    
+    # get claps
+    mutate(claps = 
+        ifelse(grepl("^[[:digit:]]+", nine), nine,
+        ifelse(grepl("^[[:digit:]]+", eight) & is.na(nine), eight,
+        ifelse(grepl("^[[:digit:]]+", seven) & is.na(eight) & is.na(nine), seven,
+        ifelse(grepl("^[[:digit:]]+", six) & is.na(seven) & is.na(eight) & is.na(nine), six,
+        ifelse(grepl("^[[:digit:]]+", five) & is.na(six) & is.na(seven) & is.na(eight) & is.na(nine), five,
+        ifelse(grepl("^[[:digit:]]+", four) & is.na(five) & is.na(six) & is.na(seven) & is.na(eight) & is.na(nine), four,
+        NA))))))) %>%
+    
+    mutate_all(funs(str_remove(., "Read more…"))) %>%
+    
+    # filter & clean up claps
+    filter(nchar(claps) <= 5) %>%
+    mutate(claps = as.numeric(sub("K", "e3", claps, fixed = T))) %>%
+    
+    # remove any/all dates from dataframee - not needed
+    mutate_all(funs(str_remove(., paste(partial_date_sequence, collapse = "|")))) %>%
+    
+    # clean up whitespace & double spaces, change to_lower and replace "" with NA
+    mutate(across(where(is.character), str_trim)) %>%
+    mutate(across(where(is.character), str_squish)) %>%
+    mutate(across(where(is.character), str_to_lower)) %>%
+    mutate_all(na_if, "")
+```
+
+
+# Final cleaning for export
+```{r}
+full_data_cleaned <- data_prepared_tbl %>% 
+    rename('name' = one) %>%
+    mutate(title = ifelse(is.na(two), three, two)) %>%
+    
+    # replace numbers with NA
+    mutate(four  = ifelse(grepl("^[[:digit:]]+", four), NA, four),
+           five  = ifelse(grepl("^[[:digit:]]+", five), NA, five),
+           six   = ifelse(grepl("^[[:digit:]]+", six), NA, six),
+           seven = ifelse(grepl("^[[:digit:]]+", seven), NA, seven),
+           eight = ifelse(grepl("^[[:digit:]]+", eight), NA, eight),
+           nine  = ifelse(grepl("^[[:digit:]]+", nine), NA, nine)) %>%
+    
+    # replace NA's with ""
+    mutate(across(everything(), ~replace_na(.x, ""))) %>%
+    
+    unite('content', four, five, six, seven, eight, nine, sep = " ") %>%
+    mutate(post_number = as.numeric(post_number),
+           claps = as.numeric(claps)) %>%
+    filter(title != "") %>%
+    select(post_number, name, title, content, claps)
+```
+
+
+# save as csv
+```{r}
+write_csv(full_data_cleaned, "00_archive/2022_data_cleaned_for_nlp.csv")
+```
+
+
